@@ -1,0 +1,172 @@
+---
+title: "practica_final_LMM"
+format: html
+editor: visual
+---
+
+Vamos a utilizar el dataset de semillas que se encuentra aquí­: https://archive.ics.uci.edu/ml/datasets/seeds#
+
+Primero vamos a descargarnos el dataset con el siguiente comando:
+
+```{r}
+library(tidyverse)
+df_seeds <- read.table('https://archive.ics.uci.edu/ml/machine-learning-databases/00236/seeds_dataset.txt', col.names =c('area','perimetro','compacto','longitud','anchura','coeficient.asimetria','longitud.ranura','tipo'))
+```
+
+#### PREGUNTA 1
+
+¿Cuántas filas y cuantas columnas tiene el dataframe df_seeds?
+
+**Respuesta**:
+
+```{r}
+paste("El dataframe tiene",nrow(df_seeds), "filas")
+paste("El dataframe tiene",ncol(df_seeds), "columnas")
+
+```
+
+#### PREGUNTA 2
+
+Vamos a convertir en factor la columna tipo. Vamos a reemplazar los números por su correspondiente etiqueta (label). La correspondencia entre el código y el tipo es:
+
+-   1 - Kama
+-   2 - Rosa
+-   3 - Canadian
+
+Convierte en factor la columna tipo, respetando las etiquetas:
+
+**Respuesta**:
+
+```{r}
+df_seeds$tipo <- factor(df_seeds$tipo, labels = c("Kama", "Rosa","Canadian"))
+
+```
+
+#### PREGUNTA 3
+
+¿Cuál es la media del área de cada uno de los tipos?
+
+**Respuesta**
+
+```{r}
+df_mean <- df_seeds |> group_by(tipo) |> summarise(area_media=mean(area))
+df_mean
+```
+
+También se podría hacer de manera individual:
+
+```{r}
+paste("La media del area del tipo Kama es:", mean(df_seeds[df_seeds$tipo=='Kama','area']))
+paste("La media del area del tipo Rosa es:", mean(df_seeds[df_seeds$tipo=='Rosa','area']))
+paste("La media del area del tipo Canadian es:", mean(df_seeds[df_seeds$tipo=='Canadian','area']))
+```
+
+#### PREGUNTA 4
+
+¿Cómo se llama el siguiente tipo de gráfico? ¿Qué representa la línea del centro de la caja?
+
+```{r}
+ggplot(df_seeds, aes(x=tipo, y=area)) + geom_boxplot()
+```
+
+**Respuesta**: El gráfico es un **boxplot**, siendo la línea del centro de la caja la representación de la **mediana**. En el boxplot también podemos ver representados los quartiles, el rango intercuartílico y los límites superior e inferior, así como los outliers.
+
+#### PREGUNTA 5
+
+¿Cómo pintarías un diagrama de puntos (o scatterplot) con ggplot con las siguientes caracterí­sticas? - En el eje X la variable compacto - En el eje Y la variable area - Cada tipo de semilla deberí­a tener un color diferente.
+
+**Respuesta**:
+
+```{r}
+plot <- ggplot(df_seeds, aes(x=compacto, y=area)) + geom_point(aes(colour = tipo)) 
+plot + scale_color_brewer(palette = "Dark2")
+```
+
+#### PREGUNTA 6
+
+¿Qué hace la siguiente lí­nea?:
+
+```{r}
+df_seeds |> mutate(is_kama = tipo=='Kama') -> df_seeds
+```
+
+**Respuesta**: Crea una nueva columna denominada is_kama que tiene valores TRUE en los casos en los que el tipo sea Kama, y FALSE en el caso contrario.
+
+#### PREGUNTA 7
+
+Vamos a dividir el conjunto de datos en test y training porque vamos a entrenar un modelo que me permita diferenciar si una semilla es de tipo Kama o no. ¿Por qué es aconsejable dividir el dataset en los grupos de train y test?
+
+```{r}
+set.seed(123) # Este set.seed hace que a todos nos generen los mismos número aleatorios
+idx <- sample(1:nrow(df_seeds), 0.7*nrow(df_seeds))
+df_seeds_train <- df_seeds[idx,]
+df_seeds_test <- df_seeds[-idx,]
+```
+
+**Respuesta**: Porque el grupo training servirá para entrenar el modelo, mientras que el test son datos "nuevos" que no entran dentro de train y se utilizará para evaluar la calidad del modelo, mostrando si dicho modelo predice de manera correcta o no con estos datos nuevos, es decir, su capacidad predictiva.
+
+#### PREGUNTA 8
+
+Vamos a crear un modelo para realizar una clasificación binaria, donde le pasaremos como entrada las columnas: area, perimetro, compacto, longitud, coeficient.asimetria y longitud.ranura
+
+¿Qué tipo de algoritmo o modelo debería usar?
+
+**Respuesta**: Un modelo de regresión logística, ya que resuelve problemas de clasificación binaria.
+
+#### PREGUNTA 9
+
+Crea un modelo que me permita clasificar si una semilla es de tipo Kama o no con las siguientes columnas: area, perimetro, compacto, longitud, coeficient.asimetria, longitud.ranura
+
+**Respuesta**:
+
+```{r}
+model <- glm(formula=is_kama~area+perimetro+compacto+longitud+coeficient.asimetria+longitud.ranura, data=df_seeds_train, family='binomial')
+
+summary(model)
+
+```
+
+#### PREGUNTA 10
+
+Si usamos un umbral de 0 en la salida del modelo (lo que equivale a probabilidad de 0.5 cuando usamos el predict con type='response') ¿Cuales son los valores de precisión y exhausitividad?
+
+**Respuesta**.
+
+```{r}
+umbral <- 0.5
+pred_test<-predict(model, df_seeds_test, type="response")
+M=table(real=df_seeds_test$is_kama, pred=pred_test>umbral)
+M
+
+paste("La precisión es:",M[2,2]/(M[1,2]+M[2,2]))
+paste("La exhaustividad es:",M[2,2]/(M[2,2]+M[2,1]))
+
+
+
+```
+
+Adicionalmente, podemos calcular el ROC y el AUC, para medir cómo de bueno es el clasificador. Como el AUC es muy próximo a 1, se trata de un buen clasificador.
+
+```{r}
+library(ROCR)
+pr <- prediction(pred_test, df_seeds_test$is_kama)
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+plot(prf)
+
+auc <- performance(pr, measure = "auc")
+paste("El AUC es ",auc@y.values[[1]])
+```
+
+#### PREGUNTA 11
+
+¿Qué están haciendo las siguientes líneas?
+
+```{r}
+set.seed(123)
+cl<-df_seeds |> select(area,perimetro,compacto,longitud,anchura,coeficient.asimetria,longitud.ranura) |> kmeans(3)
+table(real=df_seeds$tipo,cluster=cl$cluster)
+```
+
+**Respuesta**: Se están agrupando aquellos elementos de las columnas seleccionadas, que presentan características similares (si es de tipo Kama, Rosa o Canadian), mediante clustering por k-means (basado en centroides, es decir, basándose en la suma mínima de distancias entre cada elemento y el centroide de su grupo o cluster), clasificándolo en estos 3 grupos.
+
+Al observar la matriz, en el tipo Kama, 60 de los datos fueron agrupados mientras que 9 datos quedaron dentro de otro grupo, y 1 dato en otro. El tipo Rosa tiene 60 elementos en un grupo y 10 en otro, mientras que Canadian es el mejor clasificado, con 68 datos en un grupo y 2 en otro. A pesar de los valores que entren dentro de otros grupos, la mayoría de los datos caen en un grupo por cada tipo de dato (Kama, Rosa o Canadian).
