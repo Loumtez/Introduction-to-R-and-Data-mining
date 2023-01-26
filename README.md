@@ -1,1 +1,1 @@
-# Introducci-n-a-R-and-Data-Mining
+# Introduction to R and Data-mining
